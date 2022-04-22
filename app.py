@@ -5,6 +5,9 @@ from dash.dependencies import Input, Output, State
 from page_1 import page_1
 from order_page import order_page
 from error_page import error_page
+from backtest_results import backtest_results
+from backtest_parameters import backtest_parameters
+
 from navbar import navbar
 from sidebar import sidebar, SIDEBAR_HIDDEN, SIDEBAR_STYLE
 from dash.dependencies import Input, Output
@@ -136,6 +139,10 @@ def render_page_content(pathname):
         return order_page
     elif pathname == "/errors":
         return error_page
+    elif pathname == "/backtest-parameters":
+        return backtest_parameters
+    elif pathname == "/backtest-results":
+        return backtest_results
     # If the user tries to reach a different page, return a 404 message
     return html.Div(
         [
@@ -200,16 +207,16 @@ def async_handler(async_status, master_client_id, port, hostname):
     Output('placeholder-div', 'children'),
     [
         Input('trade-button', 'n_clicks'),
-        Input('contract-symbol', 'value'),
-        Input('contract-sec-type', 'value'),
-        Input('contract-currency', 'value'),
-        Input('contract-exchange', 'value'),
-        Input('contract-primary-exchange', 'value'),
-        Input('order-action', 'value'),
-        Input('order-type', 'value'),
-        Input('order-size', 'value'),
-        Input('order-lmt-price', 'value'),
-        Input('order-account', 'value')
+        State('contract-symbol', 'value'),
+        State('contract-sec-type', 'value'),
+        State('contract-currency', 'value'),
+        State('contract-exchange', 'value'),
+        State('contract-primary-exchange', 'value'),
+        State('order-action', 'value'),
+        State('order-type', 'value'),
+        State('order-size', 'value'),
+        State('order-lmt-price', 'value'),
+        State('order-account', 'value')
     ],
     prevent_initial_call = True
 )

@@ -34,11 +34,9 @@ sidebar = html.Div(
     [
         dbc.Nav(
             [
-                dbc.NavLink(
-                    "Home Screen",
-                    href="/home-screen",
-                    id="home-screen-link"
-                ),
+                dbc.NavLink("Home Screen", href="/home-screen", id="home-screen-link"),
+                dbc.NavLink("BackTest Parameters", href="/backtest-parameters", id="backtest-parameters-link"),
+                dbc.NavLink("BackTest Results", href="/backtest-results", id="backtest-results-link"),
                 dbc.NavLink("Blotter", href="/blotter", id="blotter-link"),
                 dbc.NavLink("Errors", href="/errors", id="errors-link"),
             ],
@@ -78,7 +76,11 @@ sidebar = html.Div(
         dbc.Input(id="order-lmt-price", type="number", placeholder='Limit '
                                                                    'Price'),
         dbc.Label("Account"),
-        dbc.Input(id="order-account", type="text", value = 'DU1267861')
+        dbc.Input(id="order-account", type="text", value = 'DU1267861'),
+        html.Br(),
+        html.Br(),
+        html.Br(),
+        html.Br()
     ],
     id="sidebar",
     style=SIDEBAR_STYLE
