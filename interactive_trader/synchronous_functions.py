@@ -1,3 +1,7 @@
+import numpy as np
+import pandas as pd
+from ibapi.contract import Contract
+
 
 from interactive_trader.ibkr_app import ibkr_app
 import threading
@@ -254,3 +258,14 @@ def place_order(contract, order, hostname=default_hostname,
 
     return app.order_status
 
+def data_pull(forex_asset):
+    contract = Contract()
+    contract.symbol = forex_asset
+    contract.secType = 'CASH'
+    contract.exchange = 'IDEALPRO'  # 'IDEALPRO' is the currency exchange.
+    contract.currency = 'USD'
+
+    data = fetch_historical_data(contract)
+    dataframex = pd.DataFrame(data)[['date', 'open', 'high', 'low', 'close']]
+
+    return dataframex

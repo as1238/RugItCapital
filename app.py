@@ -2,6 +2,8 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
+
+from interactive_trader.synchronous_functions import data_pull
 from page_1 import page_1
 from order_page import order_page
 from error_page import error_page
@@ -15,7 +17,13 @@ from ibapi.contract import Contract
 from ibapi.order import Order
 import time
 import threading
+import numpy as np
 import pandas as pd
+import yfinance as yf
+import statsmodels.api as sm
+import scipy.optimize as spop
+
+
 
 CONTENT_STYLE = {
     "transition": "margin-left .5s",
@@ -200,16 +208,16 @@ def async_handler(async_status, master_client_id, port, hostname):
     Output('placeholder-div', 'children'),
     [
         Input('trade-button', 'n_clicks'),
-        Input('contract-symbol', 'value'),
-        Input('contract-sec-type', 'value'),
-        Input('contract-currency', 'value'),
-        Input('contract-exchange', 'value'),
-        Input('contract-primary-exchange', 'value'),
-        Input('order-action', 'value'),
-        Input('order-type', 'value'),
-        Input('order-size', 'value'),
-        Input('order-lmt-price', 'value'),
-        Input('order-account', 'value')
+        State('contract-symbol', 'value'),
+        State('contract-sec-type', 'value'),
+        State('contract-currency', 'value'),
+        State('contract-exchange', 'value'),
+        State('contract-primary-exchange', 'value'),
+        State('order-action', 'value'),
+        State('order-type', 'value'),
+        State('order-size', 'value'),
+        State('order-lmt-price', 'value'),
+        State('order-account', 'value')
     ],
     prevent_initial_call = True
 )
@@ -248,6 +256,69 @@ def place_order(n_clicks, contract_symbol, contract_sec_type,
     )
 
     return ''
+
+#HERE WE RECEIVE FROM THE FRONTEND THE PARAMETERS
+#WE SHOULD DO An APPCALLBACK, that triggers the rug_it_entry function and output the table in the front end
+
+
+#STILL NEED TO WORK ON THE SL and TP strategies
+#Def rug_it_entry
+def rug_it_entry(pair, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_loss_b, lot_size_a, lot_size_b):
+    ccy_a = pair.split('.')[0]
+    ccy_b = pair.split('.')[1]
+
+    asset_a = data_pull(ccy_a)[['date', 'close']]
+    asset_b = data_pull(ccy_b)[['date', 'close']]
+    window = int(candle_avg)
+    pair_data = pd.merge(asset_a, asset_b, on='date')
+    pair_data.columns = ['date', 'asset_a', 'asset_b']
+    # convert date to datetime
+    pair_data['date'] = pd.to_datetime(pair_data['date'])
+
+    def calculate_log_spread(row):
+        return np.log(row['asset_a'] / row['asset_b'])
+
+    pair_data['log_spread'] = pair_data.apply(calculate_log_spread, axis=1)
+    # Calculating Moving Average
+    pair_data = pair_data.assign(SMA=pair_data['log_spread'].rolling(window).mean())
+    # Calculate rolling Standard Deviation
+    pair_data = pair_data.assign(STD=pair_data['log_spread'].rolling(window).std())
+    #print(pair_data)
+    # Z-Score
+    my_data = []
+    my_trade = []
+    trades_table = pd.DataFrame()
+
+    for ind in range(len(pair_data)):
+        my_data.append(((pair_data['log_spread'][ind]) - (pair_data['SMA'][ind])) / pair_data['STD'][ind])
+
+        if my_data[ind] < tsh_buy:
+            my_trade.append("BUY")
+            trades_table.loc[ind, 'Date'] = (date.today())
+            trades_table.loc[ind, 'Curr_A_(BUY)'] = ccy_b
+            trades_table.loc[ind, 'Curr_B_(SELL)'] = ccy_a
+            trades_table.loc[ind, 'signal'] = "BUY"
+            trades_table.loc[ind, 'Buy_price'] = 0
+            trades_table.loc[ind, 'Sell_price'] = 0
+            trades_table.loc[ind, 'size'] = lot_size_a
+        elif my_data[ind] > tsh_sell:
+            my_trade.append("SELL")
+            trades_table.loc[ind, 'Date'] = (date.today())
+            trades_table.loc[ind, 'Curr_A_(BUY)'] = ccy_a
+            trades_table.loc[ind, 'Curr_B_(SELL)'] = ccy_b
+            trades_table.loc[ind, 'signal'] = "SELL"
+            trades_table.loc[ind, 'Buy_price'] = 0
+            trades_table.loc[ind, 'Sell_price'] = 0
+            trades_table.loc[ind, 'size'] = lot_size_b
+        else:
+            my_trade.append('')
+
+    pair_data['z_score'] = my_data
+    pair_data['signal'] = my_trade
+
+    #print(trades_table)
+    return trades_table
+
 
 if __name__ == "__main__":
     app.run_server()

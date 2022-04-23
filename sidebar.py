@@ -78,7 +78,9 @@ sidebar = html.Div(
         dbc.Input(id="order-lmt-price", type="number", placeholder='Limit '
                                                                    'Price'),
         dbc.Label("Account"),
-        dbc.Input(id="order-account", type="text", value = 'DU1267861')
+        dbc.Input(id="order-account", type="text", value = 'DU5011570'),
+        dbc.Label(),
+        dbc.Label()
     ],
     id="sidebar",
     style=SIDEBAR_STYLE
