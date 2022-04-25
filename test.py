@@ -1,6 +1,7 @@
 # from interactive_trader import *
 # from datetime import datetime
 from datetime import date
+from interactive_trader.synchronous_functions import data_pull
 
 import dateutil.utils
 import pandas
