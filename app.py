@@ -222,7 +222,7 @@ def async_handler(async_status, master_client_id, port, hostname):
 # TODO is done
 
 @app.callback(
-    Output('pairBlotter-link', 'data'),
+    [Output('pairBlotter-link', 'data'), Output('pairBlotter-link', 'columns')],
     [
         # new button to start the algo defined in sidebar.py
         Input('start-algo-button', 'n_clicks'),
@@ -323,47 +323,47 @@ def rug_it_entry(n_clicks, pair, candle_avg, tsh_buy, tsh_sell, stop_loss_a, sto
 #     ],
 #     prevent_initial_call = True
 # )
-def place_order(n_clicks, contract_symbol, contract_sec_type,
-                contract_currency, contract_exchange,
-                contract_primary_exchange, order_action, order_type,
-                order_size, order_lmt_price, order_account):
-    # Contract object: STOCK
-    contract = Contract()
-    contract.symbol = contract_symbol
-    contract.secType = contract_sec_type
-    contract.currency = contract_currency
-    contract.exchange = contract_exchange
-    contract.primaryExchange = contract_primary_exchange
-
-    # ===== The above contract object needs to be a currency pair for our algo
-    # contract = Contract()
-    # contract.symbol = currency_string.split(".")[0]
-    # contract.secType = 'CASH'
-    # contract.exchange = 'IDEALPRO'  # 'IDEALPRO' is the currency exchange.
-    # contract.currency = currency_string.split(".")[1]
-
-    # Example LIMIT Order
-    order = Order()
-    order.action = order_action
-    order.orderType = order_type
-    order.totalQuantity = order_size
-
-    if order_type == 'LMT':
-        order.lmtPrice = order_lmt_price
-
-    if order_account:
-        order.account = order_account
-
-    ibkr_async_conn.reqIds(1)
-
-    # Place orders!
-    ibkr_async_conn.placeOrder(
-        ibkr_async_conn.next_valid_id,
-        contract,
-        order
-    )
-
-    return ''
+# def place_order(n_clicks, contract_symbol, contract_sec_type,
+#                 contract_currency, contract_exchange,
+#                 contract_primary_exchange, order_action, order_type,
+#                 order_size, order_lmt_price, order_account):
+#     # Contract object: STOCK
+#     contract = Contract()
+#     contract.symbol = contract_symbol
+#     contract.secType = contract_sec_type
+#     contract.currency = contract_currency
+#     contract.exchange = contract_exchange
+#     contract.primaryExchange = contract_primary_exchange
+#
+#     # ===== The above contract object needs to be a currency pair for our algo
+#     # contract = Contract()
+#     # contract.symbol = currency_string.split(".")[0]
+#     # contract.secType = 'CASH'
+#     # contract.exchange = 'IDEALPRO'  # 'IDEALPRO' is the currency exchange.
+#     # contract.currency = currency_string.split(".")[1]
+#
+#     # Example LIMIT Order
+#     order = Order()
+#     order.action = order_action
+#     order.orderType = order_type
+#     order.totalQuantity = order_size
+#
+#     if order_type == 'LMT':
+#         order.lmtPrice = order_lmt_price
+#
+#     if order_account:
+#         order.account = order_account
+#
+#     ibkr_async_conn.reqIds(1)
+#
+#     # Place orders!
+#     ibkr_async_conn.placeOrder(
+#         ibkr_async_conn.next_valid_id,
+#         contract,
+#         order
+#     )
+#
+#     return ''
 
 
 if __name__ == "__main__":
