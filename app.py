@@ -2,17 +2,17 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
-
 from interactive_trader.synchronous_functions import data_pull
 from page_1 import page_1
 from order_page import order_page
 from error_page import error_page
 from navbar import navbar
+from pair_blotter import pair_blotter
 from sidebar import sidebar, SIDEBAR_HIDDEN, SIDEBAR_STYLE
 from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
 from interactive_trader import *
-from datetime import datetime
+from datetime import datetime, date
 from ibapi.contract import Contract
 from ibapi.order import Order
 import time
@@ -22,8 +22,6 @@ import pandas as pd
 import yfinance as yf
 import statsmodels.api as sm
 import scipy.optimize as spop
-
-
 
 CONTENT_STYLE = {
     "transition": "margin-left .5s",
@@ -57,12 +55,13 @@ app.layout = html.Div(
         sidebar,
         html.Div(id="page-content", style=CONTENT_STYLE),
         dcc.Interval(
-            id = 'ibkr-update-interval',
+            id='ibkr-update-interval',
             interval=5000,
             n_intervals=0
         )
     ],
 )
+
 
 @app.callback(
     [Output('trade-blotter', 'data'), Output('trade-blotter', 'columns')],
@@ -79,6 +78,14 @@ def update_order_status(n_intervals):
     dt_columns = [{"name": i, "id": i} for i in df.columns]
     return dt_data, dt_columns
 
+
+# # This callback and function will populate the pairs blotter page
+# @app.callback(
+#     [Output('pairBlotter-link', 'data'), Output('pairBlotter-link', 'columns')],
+#     Input('rug_it_entry', 'pair, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_loss_b, lot_size_a, lot_size_b')
+# )
+
+
 @app.callback(
     [Output('errors-dt', 'data'), Output('errors-dt', 'columns')],
     Input('ibkr-update-interval', 'n_intervals')
@@ -93,6 +100,7 @@ def update_order_status(n_intervals):
     dt_data = df.to_dict('records')
     dt_columns = [{"name": i, "id": i} for i in df.columns]
     return dt_data, dt_columns
+
 
 @app.callback(
     [
@@ -123,17 +131,18 @@ def toggle_sidebar(n, nclick):
 
     return sidebar_style, content_style, cur_nclick
 
+
 # this callback uses the current pathname to set the active state of the
 # corresponding nav link to true, allowing users to tell see page they are on
 @app.callback(
-    [Output(f"page-{i}-link", "active") for i in range(1, 4)],
+    [Output(f"page-{i}-link", "active") for i in range(1, 5)],
     [Input("url", "pathname")],
 )
 def toggle_active_links(pathname):
     if pathname == "/":
         # Treat page 1 as the homepage / index
         return True, False, False
-    return [pathname == f"/page-{i}" for i in range(1, 4)]
+    return [pathname == f"/page-{i}" for i in range(1, 5)]
 
 
 @app.callback(Output("page-content", "children"), [Input("url", "pathname")])
@@ -144,6 +153,8 @@ def render_page_content(pathname):
         return order_page
     elif pathname == "/errors":
         return error_page
+    elif pathname == "/pairBlotter":
+        return pair_blotter
     # If the user tries to reach a different page, return a 404 message
     return html.Div(
         [
@@ -152,6 +163,7 @@ def render_page_content(pathname):
             html.P(f"The pathname {pathname} was not recognised..."),
         ]
     )
+
 
 @app.callback(
     Output('ibkr-async-conn-status', 'children'),
@@ -163,7 +175,6 @@ def render_page_content(pathname):
     ]
 )
 def async_handler(async_status, master_client_id, port, hostname):
-
     if async_status == "CONNECTED":
         raise PreventUpdate
         pass
@@ -204,66 +215,41 @@ def async_handler(async_status, master_client_id, port, hostname):
 
     return str(connected)
 
+# written by @mikecutro staying up until the break of dawn, hacking python
+# id tells the app what component we are referring to within layout
+# property is a value
+# TODO we need to make input fields in sidebar.py that correspond to the below id's
+# TODO is done
+
 @app.callback(
-    Output('placeholder-div', 'children'),
+    Output('pairBlotter-link', 'data'),
     [
-        Input('trade-button', 'n_clicks'),
-        State('contract-symbol', 'value'),
-        State('contract-sec-type', 'value'),
-        State('contract-currency', 'value'),
-        State('contract-exchange', 'value'),
-        State('contract-primary-exchange', 'value'),
-        State('order-action', 'value'),
-        State('order-type', 'value'),
-        State('order-size', 'value'),
-        State('order-lmt-price', 'value'),
-        State('order-account', 'value')
-    ],
-    prevent_initial_call = True
+        # new button to start the algo defined in sidebar.py
+        Input('start-algo-button', 'n_clicks'),
+        # this is the pair which is really 'contract symbol' which should be 'AUDUSD=X', 'NZDUSD=X'
+        State('pair', 'value'),
+        # candle_avg
+        State('candle-average', 'value'),
+        # tsh_buy
+        State('tsh-buy', 'value'),
+        # tsh_sell
+        State('tsh_sell', 'value'),
+        # stop_loss_a,
+        State('stop_loss_a', 'value'),
+        # stop_loss_b
+        State('stop_loss_b', 'value'),
+        # lot_size_a
+        State('lot_size_a', 'value'),
+        # lot_size_b
+        State('lot_size_b', 'value')
+    ]
+
 )
-def place_order(n_clicks, contract_symbol, contract_sec_type,
-                contract_currency, contract_exchange,
-                contract_primary_exchange, order_action, order_type,
-                order_size, order_lmt_price, order_account):
-
-    # Contract object: STOCK
-    contract = Contract()
-    contract.symbol = contract_symbol
-    contract.secType = contract_sec_type
-    contract.currency = contract_currency
-    contract.exchange = contract_exchange
-    contract.primaryExchange = contract_primary_exchange
-
-    # Example LIMIT Order
-    order = Order()
-    order.action = order_action
-    order.orderType = order_type
-    order.totalQuantity = order_size
-
-    if order_type == 'LMT':
-        order.lmtPrice = order_lmt_price
-
-    if order_account:
-        order.account = order_account
-
-    ibkr_async_conn.reqIds(1)
-
-    # Place orders!
-    ibkr_async_conn.placeOrder(
-        ibkr_async_conn.next_valid_id,
-        contract,
-        order
-    )
-
-    return ''
-
-#HERE WE RECEIVE FROM THE FRONTEND THE PARAMETERS
-#WE SHOULD DO An APPCALLBACK, that triggers the rug_it_entry function and output the table in the front end
-
-
-#STILL NEED TO WORK ON THE SL and TP strategies
-#Def rug_it_entry
-def rug_it_entry(pair, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_loss_b, lot_size_a, lot_size_b):
+# HERE WE RECEIVE FROM THE FRONTEND THE PARAMETERS
+# WE SHOULD DO An APPCALLBACK, that triggers the rug_it_entry function and output the table in the front end
+# STILL NEED TO WORK ON THE SL and TP strategies
+# Def rug_it_entry
+def rug_it_entry(n_clicks, pair, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_loss_b, lot_size_a, lot_size_b):
     ccy_a = pair.split('.')[0]
     ccy_b = pair.split('.')[1]
 
@@ -283,7 +269,7 @@ def rug_it_entry(pair, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_loss_b, 
     pair_data = pair_data.assign(SMA=pair_data['log_spread'].rolling(window).mean())
     # Calculate rolling Standard Deviation
     pair_data = pair_data.assign(STD=pair_data['log_spread'].rolling(window).std())
-    #print(pair_data)
+    # print(pair_data)
     # Z-Score
     my_data = []
     my_trade = []
@@ -316,8 +302,68 @@ def rug_it_entry(pair, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_loss_b, 
     pair_data['z_score'] = my_data
     pair_data['signal'] = my_trade
 
-    #print(trades_table)
+    # print(trades_table)
     return trades_table
+
+
+# @app.callback(
+#     Output('placeholder-div', 'children'),
+#     [
+#         Input('trade-button', 'n_clicks'),
+#         State('contract-symbol', 'value'),
+#         State('contract-sec-type', 'value'),
+#         State('contract-currency', 'value'),
+#         State('contract-exchange', 'value'),
+#         State('contract-primary-exchange', 'value'),
+#         State('order-action', 'value'),
+#         State('order-type', 'value'),
+#         State('order-size', 'value'),
+#         State('order-lmt-price', 'value'),
+#         State('order-account', 'value')
+#     ],
+#     prevent_initial_call = True
+# )
+def place_order(n_clicks, contract_symbol, contract_sec_type,
+                contract_currency, contract_exchange,
+                contract_primary_exchange, order_action, order_type,
+                order_size, order_lmt_price, order_account):
+    # Contract object: STOCK
+    contract = Contract()
+    contract.symbol = contract_symbol
+    contract.secType = contract_sec_type
+    contract.currency = contract_currency
+    contract.exchange = contract_exchange
+    contract.primaryExchange = contract_primary_exchange
+
+    # ===== The above contract object needs to be a currency pair for our algo
+    # contract = Contract()
+    # contract.symbol = currency_string.split(".")[0]
+    # contract.secType = 'CASH'
+    # contract.exchange = 'IDEALPRO'  # 'IDEALPRO' is the currency exchange.
+    # contract.currency = currency_string.split(".")[1]
+
+    # Example LIMIT Order
+    order = Order()
+    order.action = order_action
+    order.orderType = order_type
+    order.totalQuantity = order_size
+
+    if order_type == 'LMT':
+        order.lmtPrice = order_lmt_price
+
+    if order_account:
+        order.account = order_account
+
+    ibkr_async_conn.reqIds(1)
+
+    # Place orders!
+    ibkr_async_conn.placeOrder(
+        ibkr_async_conn.next_valid_id,
+        contract,
+        order
+    )
+
+    return ''
 
 
 if __name__ == "__main__":

@@ -2,3 +2,6 @@ pandas
 dash
 ibapi
 dash-bootstrap-components
+statsmodels
+yfinance
+scipy

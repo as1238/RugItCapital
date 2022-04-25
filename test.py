@@ -105,7 +105,6 @@ def data_pull(forex_asset):
 
 
 dataFin = rug_it_entry(pair, candle_avg, tsh_buy, tsh_sell)
-dataFin.to_csv('C:/Users/vcm/Desktop/output.txt')
 print(dataFin)
 
 # for ind in dataFin.index:
