@@ -215,35 +215,28 @@ def async_handler(async_status, master_client_id, port, hostname):
 
     return str(connected)
 
-# written by @mikecutro staying up until the break of dawn, hacking python
-# id tells the app what component we are referring to within layout
-# property is a value
-# TODO we need to make input fields in sidebar.py that correspond to the below id's
-# TODO is done
-
 @app.callback(
     [Output('pairBlotter-link', 'data'), Output('pairBlotter-link', 'columns')],
     [
         # new button to start the algo defined in sidebar.py
         Input('start-algo-button', 'n_clicks'),
-        # this is the pair which is really 'contract symbol' which should be 'AUDUSD=X', 'NZDUSD=X'
         State('pair', 'value'),
         # candle_avg
-        State('candle-average', 'value'),
+        State('candle-avg', 'value'),
         # tsh_buy
         State('tsh-buy', 'value'),
         # tsh_sell
         State('tsh_sell', 'value'),
         # stop_loss_a,
-        State('stop_loss_a', 'value'),
+        State('stop-loss-a', 'value'),
         # stop_loss_b
-        State('stop_loss_b', 'value'),
+        State('stop-loss-b', 'value'),
         # lot_size_a
-        State('lot_size_a', 'value'),
+        State('lot-size-a', 'value'),
         # lot_size_b
-        State('lot_size_b', 'value')
-    ]
-
+        State('lot-size-b', 'value')
+    ],
+    prevent_initial_call = True
 )
 # HERE WE RECEIVE FROM THE FRONTEND THE PARAMETERS
 # WE SHOULD DO An APPCALLBACK, that triggers the rug_it_entry function and output the table in the front end
@@ -261,50 +254,106 @@ def rug_it_entry(n_clicks, pair, candle_avg, tsh_buy, tsh_sell, stop_loss_a, sto
     # convert date to datetime
     pair_data['date'] = pd.to_datetime(pair_data['date'])
 
+    # creating a new Candle Average column and calculating moving average
+
     def calculate_log_spread(row):
-        return np.log(row['asset_a'] / row['asset_b'])
+        return np.log(row['asset_b'] / row['asset_a'])
 
     pair_data['log_spread'] = pair_data.apply(calculate_log_spread, axis=1)
     # Calculating Moving Average
     pair_data = pair_data.assign(SMA=pair_data['log_spread'].rolling(window).mean())
+    pair_data.loc[:, 'SMA'] = pair_data.SMA.shift(1)
     # Calculate rolling Standard Deviation
     pair_data = pair_data.assign(STD=pair_data['log_spread'].rolling(window).std())
+    pair_data.loc[:, 'STD'] = pair_data.STD.shift(1)
     # print(pair_data)
     # Z-Score
-    my_data = []
-    my_trade = []
     trades_table = pd.DataFrame()
 
     for ind in range(len(pair_data)):
-        my_data.append(((pair_data['log_spread'][ind]) - (pair_data['SMA'][ind])) / pair_data['STD'][ind])
+        #my_data.append(((pair_data['log_spread'][ind]) - (pair_data['SMA'][ind])) / pair_data['STD'][ind])
+        pair_data.loc[ind, 'z_score'] = (((pair_data['log_spread'][ind]) - (pair_data['SMA'][ind])) / pair_data['STD'][ind])
 
-        if my_data[ind] < tsh_buy:
-            my_trade.append("BUY")
+        if pair_data.loc[ind, 'z_score'] < tsh_buy:
+            pair_data.loc[ind, 'signal'] = "BUY"
             trades_table.loc[ind, 'Date'] = (date.today())
             trades_table.loc[ind, 'Curr_A_(BUY)'] = ccy_b
             trades_table.loc[ind, 'Curr_B_(SELL)'] = ccy_a
             trades_table.loc[ind, 'signal'] = "BUY"
-            trades_table.loc[ind, 'Buy_price'] = 0
-            trades_table.loc[ind, 'Sell_price'] = 0
+            trades_table.loc[ind, 'Buy_price'] = pair_data.loc[ind, 'asset_b']
+            trades_table.loc[ind, 'Sell_price'] = pair_data.loc[ind, 'asset_a']
             trades_table.loc[ind, 'size'] = lot_size_a
-        elif my_data[ind] > tsh_sell:
-            my_trade.append("SELL")
+
+        elif pair_data.loc[ind, 'z_score'] > tsh_sell:
+            pair_data.loc[ind, 'signal'] = "SELL"
             trades_table.loc[ind, 'Date'] = (date.today())
             trades_table.loc[ind, 'Curr_A_(BUY)'] = ccy_a
             trades_table.loc[ind, 'Curr_B_(SELL)'] = ccy_b
             trades_table.loc[ind, 'signal'] = "SELL"
-            trades_table.loc[ind, 'Buy_price'] = 0
-            trades_table.loc[ind, 'Sell_price'] = 0
+            trades_table.loc[ind, 'Buy_price'] = pair_data.loc[ind, 'asset_a']
+            trades_table.loc[ind, 'Sell_price'] = pair_data.loc[ind, 'asset_b']
             trades_table.loc[ind, 'size'] = lot_size_b
+
         else:
-            my_trade.append('')
+            pair_data.loc[ind, 'signal'] = ''
 
-    pair_data['z_score'] = my_data
-    pair_data['signal'] = my_trade
+    #for to complete the pair_data Backtesting
+    for ind2 in range(len(pair_data)):
+        if ind2 == 0:
+            pair_data.loc[ind2, 'Buy_price'] = ''
+            pair_data.loc[ind2, 'Sell_price'] = ''
+            pair_data.loc[ind2, 'MTM'] = ''
+            pair_data.loc[ind2, 'TP_SL'] = ''
+        if ind2 > 0:
+            #Buy and Sell price logic
+            if pair_data.loc[(ind2-1), 'TP_SL'] == pair_data.loc[ind2, 'TP_SL']:
+                pair_data.loc[ind2, 'Buy_price'] = pair_data.loc[(ind2-1), 'Buy_price']
+                pair_data.loc[ind2, 'Sell_price'] = pair_data.loc[(ind2-1), 'Sell_price']
+            elif pair_data.loc[ind2, 'TP_SL'] == "TP" or pair_data.loc[ind2, 'TP_SL'] == "SL":
+                pair_data.loc[ind2, 'Buy_price'] = ''
+                pair_data.loc[ind2, 'Sell_price'] = ''
+            elif pair_data.loc[ind2, 'signal'] == "BUY":
+                pair_data.loc[ind2, 'Buy_price'] = pair_data.loc[ind2, 'asset_b']
+                pair_data.loc[ind2, 'Sell_price'] = pair_data.loc[ind2, 'asset_a']
+            elif pair_data.loc[ind2, 'signal'] == "SELL":
+                pair_data.loc[ind2, 'Buy_price'] = pair_data.loc[ind2, 'asset_a']
+                pair_data.loc[ind2, 'Sell_price'] = pair_data.loc[ind2, 'asset_b']
 
+            #Mark to market logic
+            if pair_data.loc[(ind2-1), 'TP_SL'] == "BUY":
+                pair_data.loc[ind2, 'MTM'] = (pair_data.loc[(ind2-1), 'Sell_price'] - pair_data.loc[
+                    ind2, 'asset_a']) * lot_size_a + (pair_data.loc[ind2, 'asset_b'] - pair_data.loc[
+                    (ind2-1), 'Buy_price']) * lot_size_b
+            elif pair_data.loc[(ind2-1), 'TP_SL'] == "SELL":
+                pair_data.loc[ind2, 'MTM'] = (pair_data.loc[(ind2 - 1), 'Sell_price'] - pair_data.loc[
+                    ind2, 'asset_b']) * lot_size_b + (pair_data.loc[ind2, 'asset_a'] - pair_data.loc[
+                    (ind2 - 1), 'Buy_price']) * lot_size_a
+            else:
+                pair_data.loc[ind2, 'MTM']= ''
+
+            #Stop-Loss and Take profit
+            if pair_data.loc[(ind2-1), 'TP_SL'] == "TP" or pair_data.loc[(ind2-1), 'TP_SL'] == "SL" or pair_data.loc[(ind2-1), 'TP_SL'] == '':
+                pair_data.loc[ind2, 'TP_SL'] = pair_data.loc[ind2, 'signal']
+            elif pair_data.loc[ind2, 'MTM'] == '':
+                pair_data.loc[ind2, 'TP_SL'] = ''
+            elif pair_data.loc[ind2, 'MTM'] < stop_loss_a:
+                pair_data.loc[ind2, 'TP_SL'] = "SL"
+            elif pair_data.loc[ind2, 'MTM'] > stop_loss_b:
+                pair_data.loc[ind2, 'TP_SL'] = "TP"
+            else:
+                pair_data.loc[ind2, 'TP_SL'] = pair_data.loc[ind2, 'signal']
+
+        #Profit & loss
+            if pair_data.loc[ind2, 'TP_SL'] == "TP" or pair_data.loc[ind2, 'TP_SL'] == "SL":
+                pair_data.loc[ind2, 'P&L'] = pair_data.loc[ind2, 'MTM']
+            else:
+                pair_data.loc[ind2, 'P&L'] = 0
+
+    profits = pair_data.loc[:, 'P&L'].sum()
+    trades_table.to_csv('Backtesting.csv')
+    #print(profits)
     # print(trades_table)
-    return trades_table
-
+    return trades_table.to_dict('records'), [{"name": i, "id": i} for i in trades_table.columns]
 
 # @app.callback(
 #     Output('placeholder-div', 'children'),
@@ -364,7 +413,6 @@ def rug_it_entry(n_clicks, pair, candle_avg, tsh_buy, tsh_sell, stop_loss_a, sto
 #     )
 #
 #     return ''
-
 
 if __name__ == "__main__":
     app.run_server()
