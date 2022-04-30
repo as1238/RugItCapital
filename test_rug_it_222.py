@@ -33,11 +33,6 @@ def rug_it_entry(ccy_a, ccy_b, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_
     asset_b = yf.download(ccy_b, start, end)
     asset_b.reset_index(inplace=True)
 
-    # asset_a = data_pull(ccy_a)
-    # asset_a.reset_index(inplace=True)
-    # asset_b = data_pull(ccy_b)
-    # asset_b.reset_index(inplace=True)
-
     big_table = pd.DataFrame()
 
     big_table['Date'] = asset_a['Date']
@@ -92,6 +87,7 @@ def rug_it_entry(ccy_a, ccy_b, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_
     Sell_Price = []
     MTM = []
     status = []
+    Lot_Size = []
 
     for i in range(0, nRows):
         if (i < candle_avg):
@@ -141,6 +137,9 @@ def rug_it_entry(ccy_a, ccy_b, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_
                 Buy_Price.append(''),
                 Sell_Price.append('')
 
+        Lot_Size.append(lot_size_a)
+
+
     # print(MTM)
     # print(status)
     # print(Buy_Price)
@@ -150,16 +149,17 @@ def rug_it_entry(ccy_a, ccy_b, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_
     big_table2['Sell_Price'] = Sell_Price
     big_table2['MTM'] = MTM
     big_table2['Status'] = status
+    big_table2['Lot_Size'] = Lot_Size
 
     final_table = big_table2.copy(deep=True)
     final_table = final_table[final_table['Status'].isin(['SL', 'TP', 'BUY', 'SELL'])]
-    final_table = final_table.drop(columns=['NLog', 'Candle_Average', 'StDev', 'Z-Score', 'Buy', 'Sell'])
+    final_table = final_table.drop(columns=['NLog', 'Candle_Average', 'StDev', 'Z-Score', 'Buy', 'Sell', 'MTM', 'Status'])
 
-    Profit2 = final_table.loc[final_table['Status'].isin(['SL', 'TP']), 'MTM'].sum()
-    Profit2 = "${:,.2f}".format(Profit2)
+    # Profit2 = final_table.loc[final_table['Status'].isin(['SL', 'TP']), 'MTM'].sum()
+    # Profit2 = "${:,.2f}".format(Profit2)
     # print(final_table)
 
-    return final_table, Profit2
+    return final_table
 
 
 # def data_pull(forex_asset):
