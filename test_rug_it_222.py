@@ -33,15 +33,10 @@ def rug_it_entry(ccy_a, ccy_b, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_
     asset_b = yf.download(ccy_b, start, end)
     asset_b.reset_index(inplace=True)
 
-    # asset_a = data_pull(ccy_a)
-    # asset_a.reset_index(inplace=True)
-    # asset_b = data_pull(ccy_b)
-    # asset_b.reset_index(inplace=True)
-
     big_table = pd.DataFrame()
 
     big_table['Date'] = asset_a['Date']
-    big_table['Date'] = pd.to_datetime(big_table['Date'])
+    # big_table['Date'] = pd.to_datetime(big_table['Date'])
     big_table[ccy_a] = asset_a['Close']
     big_table[ccy_a] = pd.to_numeric(big_table[ccy_a])
     big_table[ccy_b] = asset_b['Close']
@@ -92,6 +87,14 @@ def rug_it_entry(ccy_a, ccy_b, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_
     Sell_Price = []
     MTM = []
     status = []
+    Lot_Size = []
+    Trades = []
+
+    # oh my God, some more lists to fill in some more columns in the big table to get correct final table
+    Buy_Price_F = []
+    Sell_Price_F = []
+    Curr_Buy = []
+    Curr_Sell = []
 
     for i in range(0, nRows):
         if (i < candle_avg):
@@ -99,6 +102,11 @@ def rug_it_entry(ccy_a, ccy_b, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_
             status.append('')
             Buy_Price.append('')
             Sell_Price.append('')
+            Trades.append('')
+            Buy_Price_F.append('')
+            Sell_Price_F.append('')
+            Curr_Buy.append('')
+            Curr_Sell.append('')
         else:
             # Filling MTM list depending on value of previous (i-1) index of Status list
             if (status[i - 1] == 'BUY'):
@@ -141,6 +149,49 @@ def rug_it_entry(ccy_a, ccy_b, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_
                 Buy_Price.append(''),
                 Sell_Price.append('')
 
+            # Filling Trades column to use it further for keeping only rows with Trades happened
+            if (status[i] != status[i - 1] and status[i] != ''):
+                Trades.append('Tx Done')
+            else:
+                Trades.append('')
+
+            # Filling 2 columns to get Buy and Sell Prices
+            if ((status[i] == 'TP' or status[i] == 'SL') and status[i - 1] == 'SELL'):
+                Buy_Price_F.append(big_table2.at[i, ccy_b]),
+                Sell_Price_F.append(big_table2.at[i, ccy_a])
+            elif ((status[i] == 'TP' or status[i] == 'SL') and status[i - 1] == 'BUY'):
+                Buy_Price_F.append(big_table2.at[i, ccy_a]),
+                Sell_Price_F.append(big_table2.at[i, ccy_b])
+            elif (status[i] == 'SELL' and status[i - 1] != 'SELL'):
+                Buy_Price_F.append(big_table2.at[i, ccy_a]),
+                Sell_Price_F.append(big_table2.at[i, ccy_b])
+            elif (status[i] == 'BUY' and status[i - 1] != 'BUY'):
+                Buy_Price_F.append(big_table2.at[i, ccy_b]),
+                Sell_Price_F.append(big_table2.at[i, ccy_a])
+            else:
+                Buy_Price_F.append(''),
+                Sell_Price_F.append('')
+
+            # Filling 2 columns to set which currencies we're Buying and Selling
+            if (status[i] == 'SELL' and status[i - 1] != 'SELL'):
+                Curr_Buy.append(ccy_a),
+                Curr_Sell.append(ccy_b)
+            elif (status[i] == 'BUY' and status[i - 1] != 'BUY'):
+                Curr_Buy.append(ccy_b),
+                Curr_Sell.append(ccy_a)
+            elif ((status[i] == 'SL' or status[i] == 'TP') and status[i - 1] == 'BUY'):
+                Curr_Buy.append(ccy_a),
+                Curr_Sell.append(ccy_b)
+            elif ((status[i] == 'SL' or status[i] == 'TP') and status[i - 1] == 'SELL'):
+                Curr_Buy.append(ccy_b),
+                Curr_Sell.append(ccy_a)
+            else:
+                Curr_Buy.append(''),
+                Curr_Sell.append('')
+
+        Lot_Size.append(lot_size_a)
+
+
     # print(MTM)
     # print(status)
     # print(Buy_Price)
@@ -150,14 +201,30 @@ def rug_it_entry(ccy_a, ccy_b, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_
     big_table2['Sell_Price'] = Sell_Price
     big_table2['MTM'] = MTM
     big_table2['Status'] = status
+    big_table2['Lot_Size'] = Lot_Size
+    big_table2['Trades'] = Trades
+    big_table2['Buy_Price_F'] = Buy_Price_F
+    big_table2['Sell_Price_F'] = Sell_Price_F
+    big_table2['Currency_Buy'] = Curr_Buy
+    big_table2['Currency_Sell'] = Curr_Sell
 
-    final_table = big_table2.copy(deep=True)
-    final_table = final_table[final_table['Status'].isin(['SL', 'TP', 'BUY', 'SELL'])]
-    final_table = final_table.drop(columns=['NLog', 'Candle_Average', 'StDev', 'Z-Score', 'Buy', 'Sell'])
-
-    Profit2 = final_table.loc[final_table['Status'].isin(['SL', 'TP']), 'MTM'].sum()
+    Profit2 = big_table2.loc[big_table2['Status'].isin(['SL', 'TP']), 'MTM'].sum()
     Profit2 = "${:,.2f}".format(Profit2)
-    # print(final_table)
+
+    prefinal_table = big_table2.copy(deep=True)
+    prefinal_table = prefinal_table[prefinal_table['Trades'].isin(['Tx Done'])]
+
+    # final_table = final_table.drop(columns=[ccy_a, ccy_b, 'NLog', 'Candle_Average', 'StDev', 'Z-Score', 'Signal', 'Buy', 'Sell', 'Trades'])
+
+    final_table = pd.DataFrame()
+
+    final_table['Date'] = prefinal_table['Date']
+    final_table['Currency_Buy'] = prefinal_table['Currency_Buy']
+    final_table['Currency_Sell'] = prefinal_table['Currency_Sell']
+    final_table['Buy_Price'] = prefinal_table['Buy_Price_F']
+    final_table['Sell_Price'] = prefinal_table['Sell_Price_F']
+    final_table['Status'] = prefinal_table['Status']
+    final_table['MTM'] = prefinal_table['MTM']
 
     return final_table, Profit2
 
