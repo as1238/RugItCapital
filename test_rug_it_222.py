@@ -36,7 +36,7 @@ def rug_it_entry(ccy_a, ccy_b, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_
     big_table = pd.DataFrame()
 
     big_table['Date'] = asset_a['Date']
-    big_table['Date'] = pd.to_datetime(big_table['Date'])
+    # big_table['Date'] = pd.to_datetime(big_table['Date'])
     big_table[ccy_a] = asset_a['Close']
     big_table[ccy_a] = pd.to_numeric(big_table[ccy_a])
     big_table[ccy_b] = asset_b['Close']
@@ -151,15 +151,18 @@ def rug_it_entry(ccy_a, ccy_b, candle_avg, tsh_buy, tsh_sell, stop_loss_a, stop_
     big_table2['Status'] = status
     big_table2['Lot_Size'] = Lot_Size
 
+    Profit2 = big_table2.loc[big_table2['Status'].isin(['SL', 'TP']), 'MTM'].sum()
+    Profit2 = "${:,.2f}".format(Profit2)
+
     final_table = big_table2.copy(deep=True)
     final_table = final_table[final_table['Status'].isin(['SL', 'TP', 'BUY', 'SELL'])]
-    final_table = final_table.drop(columns=['NLog', 'Candle_Average', 'StDev', 'Z-Score', 'Buy', 'Sell', 'MTM', 'Status'])
+    final_table = final_table.drop(columns=[ccy_a, ccy_b, 'NLog', 'Candle_Average', 'StDev', 'Z-Score', 'Signal', 'Buy', 'Sell'])
 
     # Profit2 = final_table.loc[final_table['Status'].isin(['SL', 'TP']), 'MTM'].sum()
     # Profit2 = "${:,.2f}".format(Profit2)
     # print(final_table)
 
-    return final_table
+    return final_table, Profit2
 
 
 # def data_pull(forex_asset):
